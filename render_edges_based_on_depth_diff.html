@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - Depth Texture</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			#error {
+				margin: auto;
+				margin-top: 40px;
+				display: block;
+				max-width: 400px;
+				padding: 20px;
+				background: #CE0808;
+			}
+		</style>
+
+	</head>
+	<body>
+		<div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">threejs</a> webgl - depth texture<br/>
+			Stores render target depth in a texture attachment.<br/>
+			Created by <a href="http://twitter.com/mattdesl" target="_blank" rel="noopener">@mattdesl</a>.
+
+			<input type="file" id="fileInput">
+
+			<div id="error" style="display: none;">
+			Your browser does not support <strong>WEBGL_depth_texture</strong>.<br/><br/>
+			This demo will not work.
+			</div>
+		</div>
+		<script type="importmap">
+			{
+			  "imports": {
+				"three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+				"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+			  }
+			}
+		</script>
+		<script id="post-vert" type="x-shader/x-vertex">
+			varying float vDepth;
+			varying vec2 vUv;
+			void main() {
+				vec4 modelViewPosition = modelViewMatrix * vec4(position, 1.0);
+				vDepth = -modelViewPosition.z;
+				vUv = uv;
+				gl_Position = projectionMatrix * modelViewPosition;
+			}
+
+		</script>
+		<script id="post-frag" type="x-shader/x-fragment">
+			#include <packing>
+
+			uniform sampler2D depthTexture1;
+			uniform sampler2D depthTexture2;
+			varying float vDepth;
+			varying vec2 vUv;
+
+			uniform float cameraNear;
+			uniform float cameraFar;
+			
+			void main() {
+				// material
+				float fragCoordZ1 = texture2D(depthTexture1, vUv).x;
+				float viewZ1 = perspectiveDepthToViewZ( fragCoordZ1, cameraNear, cameraFar );
+				float sceneDepth1 = viewZToOrthographicDepth( viewZ1, cameraNear, cameraFar );
+
+				// edges
+				float fragCoordZ2 = texture2D(depthTexture2, vUv).x;
+				float viewZ2 = perspectiveDepthToViewZ( fragCoordZ2, cameraNear, cameraFar );
+				float sceneDepth2 = viewZToOrthographicDepth( viewZ2, cameraNear, cameraFar );
+				
+				if (sceneDepth2 > sceneDepth1 + 0.005) { // Adjust threshold as needed
+					gl_FragColor = vec4(0, 0, 0, 1.0);
+				} else {
+					float depth = 0.75; // / 100.0; // Adjust this value based on your scene
+					gl_FragColor = vec4(depth, depth, depth, 1.0);
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+			// Scene setup
+			const scene = new THREE.Scene();
+			const scene2 = new THREE.Scene();
+			const scene3 = new THREE.Scene();
+			const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+			camera.near = 1;
+			camera.far = 200;
+			const renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.body.appendChild(renderer.domElement);
+
+			const controls = new OrbitControls( camera, renderer.domElement );
+			controls.enableDamping = true;
+
+			// Camera position
+			camera.position.z = 5;
+
+			const depthTexture = new THREE.DepthTexture();
+			// const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+			// 	depthTexture: depthTexture,
+			// 	depthBuffer: true,
+			// 	// format: THREE.DepthFormat
+			// });
+			const renderTarget = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight );
+			renderTarget.texture.minFilter = THREE.NearestFilter;
+			renderTarget.texture.magFilter = THREE.NearestFilter;
+			renderTarget.stencilBuffer = false;
+			renderTarget.depthTexture = new THREE.DepthTexture();
+			renderTarget.depthTexture.format = THREE.DepthFormat;
+			renderTarget.depthTexture.type = THREE.UnsignedShortType;
+
+			const renderTarget1 = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight );
+			renderTarget1.texture.minFilter = THREE.NearestFilter;
+			renderTarget1.texture.magFilter = THREE.NearestFilter;
+			renderTarget1.stencilBuffer = false;
+			renderTarget1.depthTexture = new THREE.DepthTexture();
+			renderTarget1.depthTexture.format = THREE.DepthFormat;
+			renderTarget1.depthTexture.type = THREE.UnsignedShortType;
+
+			const postCamera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 );
+
+			// first attempt
+			if(false) {
+				const vertexShader = `
+				varying vec4 vWorldPosition;
+
+				void main() {
+					vWorldPosition = modelMatrix * vec4(position, 1.0);
+					gl_Position = projectionMatrix * viewMatrix * vWorldPosition;
+				}
+				`;
+
+				const fragmentShader = `
+				uniform sampler2D depthTexture;
+				uniform vec2 resolution;
+				varying vec4 vWorldPosition;
+
+				void main() {
+					vec2 screenCoords = gl_FragCoord.xy / resolution;
+					float sceneDepth = texture2D(depthTexture, screenCoords).r;
+					float lineDepth = gl_FragCoord.z / gl_FragCoord.w;
+
+					if (lineDepth > sceneDepth) {
+						// discard;
+					}
+
+					gl_FragColor = vec4(gl_FragCoord.w, 0, 0, 1.0); // Set line color
+				}
+				`;
+
+				const lineMaterial = new THREE.ShaderMaterial({
+					vertexShader: vertexShader,
+					fragmentShader: fragmentShader,
+					uniforms: {
+						depthTexture: { value: depthTexture },
+						resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+					},
+					transparent: true
+				});
+			}
+
+			// second attempt show depth on egdes
+			if(false)
+			{
+				const vertexShader1 = `
+				varying float vDepth;
+				void main() {
+					vec4 modelViewPosition = modelViewMatrix * vec4(position, 1.0);
+					vDepth = -modelViewPosition.z;
+					gl_Position = projectionMatrix * modelViewPosition;
+				}
+				`;
+
+				// Fragment Shader
+				const fragmentShader1 = `
+					varying float vDepth;
+					void main() {
+						float depth = vDepth / 100.0; // Adjust this value based on your scene
+						gl_FragColor = vec4(depth, depth, depth, 1.0);
+					}
+				`;
+			}
+
+			// Create the shader material
+			const depthMaterial = new THREE.ShaderMaterial({
+				vertexShader: document.querySelector( '#post-vert' ).textContent.trim(),
+				fragmentShader: document.querySelector( '#post-frag' ).textContent.trim(),
+				uniforms: {
+    				depthTexture1: { value: null },
+    				depthTexture2: { value: null },
+					cameraNear: { value: camera.near },
+					cameraFar: { value: camera.far },
+  				}
+			});
+
+			const wallGeometry = new THREE.PlaneGeometry(1000, 1000);
+		    const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+
+			// walls to make bg black
+			const wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
+			wall1.position.set(0, 0, -50);
+			scene.add(wall1);
+
+			const wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
+			wall2.position.set(0, 0, -60);
+			scene2.add(wall2);
+
+			const basicMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+			// todo: show delta of depth
+
+			const postPlane = new THREE.PlaneGeometry( 2, 2 );
+			const postQuad = new THREE.Mesh( postPlane, depthMaterial );
+			scene3.add(postQuad);
+
+			function render() {
+				// Render the scene to the render target (depth texture)
+				// scene.overrideMaterial = basicMaterial;
+				renderer.setRenderTarget(renderTarget);
+				renderer.render(scene, camera);
+				depthMaterial.uniforms.depthTexture1.value = renderTarget.depthTexture;
+
+				renderer.setRenderTarget(renderTarget1);
+				renderer.render(scene2, camera);
+				depthMaterial.uniforms.depthTexture2.value = renderTarget1.depthTexture;
+				
+				// Reset render target to default (render to screen)
+				renderer.setRenderTarget(null);
+				// renderer.overrideMaterial = null;
+				// renderer.clear();
+
+				// Render the scene normally
+				renderer.render(scene3, postCamera);
+			}
+
+			renderer.setAnimationLoop(render);
+
+			let model = new THREE.Object3D();
+			let edgesModel = new THREE.Object3D();
+			document.getElementById('fileInput').addEventListener('change', (event) => {
+				const file = event.target.files ? event.target.files[0] : null;
+				if (file) {
+					const reader = new FileReader();
+					reader.readAsDataURL(file);
+
+					reader.onload = (e) => {
+						const url = reader.result;
+
+						const loader = new OBJLoader();
+						loader.load(url, (o) => {
+							if (model) {
+								scene.remove(model);
+							}
+							// model = o;
+
+							o.traverse((child) => {
+								if (child.isMesh) {
+									const geometry = mergeVertices(child.geometry);
+									geometry.computeVertexNormals();
+
+									const edgesGeometry = new THREE.EdgesGeometry(geometry);
+									const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x00FFF0 });
+									const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+									edgesModel.add(edges);
+
+									const material = new THREE.MeshPhongMaterial({ color: 0x000000});
+									const mesh = new THREE.Mesh(geometry, material);
+									model.add(mesh);
+								}
+							});
+
+							scene.add(model);
+							scene2.add(edgesModel);
+						});
+					};
+				}
+			});
+
+		</script>
+
+	</body>
+</html>
