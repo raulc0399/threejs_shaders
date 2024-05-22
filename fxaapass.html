@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - Depth Texture</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			#error {
+				margin: auto;
+				margin-top: 40px;
+				display: block;
+				max-width: 400px;
+				padding: 20px;
+				background: #CE0808;
+			}
+		</style>
+
+	</head>
+	<body>
+		<div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">threejs</a> webgl - depth texture<br/>
+			Stores render target depth in a texture attachment.<br/>
+			Created by <a href="http://twitter.com/mattdesl" target="_blank" rel="noopener">@mattdesl</a>.
+
+			<input type="file" id="fileInput">
+
+			<div id="error" style="display: none;">
+			Your browser does not support <strong>WEBGL_depth_texture</strong>.<br/><br/>
+			This demo will not work.
+			</div>
+		</div>
+		<script type="importmap">
+			{
+			  "imports": {
+				"three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+				"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+			  }
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+			import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+			import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+			import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+			import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+
+			// Scene setup
+			const scene = new THREE.Scene();
+			const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+			const renderer = new THREE.WebGLRenderer();
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.setClearColor(0x000000); 
+			document.body.appendChild(renderer.domElement);
+
+			// const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+			// directionalLight.position.set(5, 10, 7.5);
+			// scene.add(directionalLight);
+
+			// const ambientLight = new THREE.AmbientLight(0x404040); // soft white light
+			// scene.add(ambientLight);
+
+			const controls = new OrbitControls( camera, renderer.domElement );
+			controls.enableDamping = true;
+
+			// Camera position
+			camera.position.z = 5;
+
+			const renderPass = new RenderPass( scene, camera );
+			// renderPass.clearAlpha = 0;
+
+			const fxaaPass = new ShaderPass( FXAAShader );
+
+			const outputPass = new OutputPass();
+
+			const pixelRatio = renderer.getPixelRatio();
+
+			fxaaPass.material.uniforms[ 'resolution' ].value.x = 1 / ( window.innerWidth  * pixelRatio );
+			fxaaPass.material.uniforms[ 'resolution' ].value.y = 1 / ( window.innerHeight * pixelRatio );
+
+			const composer2 = new EffectComposer( renderer );
+			composer2.addPass( renderPass );
+			composer2.addPass( outputPass );
+
+			// FXAA is engineered to be applied towards the end of engine post processing after conversion to low dynamic range and conversion to the sRGB color space for display.
+
+			composer2.addPass( fxaaPass );
+
+			// Animation loop
+			function animate() {
+				requestAnimationFrame(animate);
+				
+				// renderer.render(scene, camera);
+				composer2.render();
+			}
+			animate();
+
+			let model = new THREE.Object3D();
+			document.getElementById('fileInput').addEventListener('change', (event) => {
+				const file = event.target.files ? event.target.files[0] : null;
+				if (file) {
+					const reader = new FileReader();
+					reader.readAsDataURL(file);
+
+					reader.onload = (e) => {
+						const url = reader.result;
+
+						const loader = new OBJLoader();
+						loader.load(url, (o) => {
+							if (model) {
+								scene.remove(model);
+							}
+							// model = o;
+
+							o.traverse((child) => {
+								if (child.isMesh) {
+									const edgesGeometry = new THREE.EdgesGeometry(child.geometry);
+									const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x00FFF0 });
+									const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+
+									// child.material = new THREE.MeshNormalMaterial();
+
+									// model.add(child);
+									model.add(edges);
+								}
+							});
+
+							// scene.add(o);
+							scene.add(model);
+							
+						});
+					};
+				}
+			});
+
+		</script>
+
+	</body>
+</html>
