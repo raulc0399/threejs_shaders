@@ -118,10 +118,12 @@
 							o.traverse((child) => {
 								if (child.isMesh) {
 									const edgesGeometry = new THREE.EdgesGeometry(child.geometry);
-									const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x00FFF0 });
+									const edgesMaterial = new THREE.LineBasicMaterial({ color: 0xFFFFFF });
 									const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
 
-									// child.material = new THREE.MeshNormalMaterial();
+									const material = new THREE.MeshPhongMaterial({ color: 0x000000});
+									const mesh = new THREE.Mesh(child.geometry, material);
+									model.add(mesh);
 
 									// model.add(child);
 									model.add(edges);
