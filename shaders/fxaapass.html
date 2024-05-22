@@ -42,6 +42,7 @@
 			import * as THREE from 'three';
 			import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
 			import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 			import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 			import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -69,25 +70,21 @@
 			// Camera position
 			camera.position.z = 5;
 
-			const renderPass = new RenderPass( scene, camera );
-			// renderPass.clearAlpha = 0;
-
-			const fxaaPass = new ShaderPass( FXAAShader );
-
+			const composer2 = new EffectComposer(renderer);
+			
+			const renderPass = new RenderPass(scene, camera);
+			composer2.addPass(renderPass);
+			
 			const outputPass = new OutputPass();
+			composer2.addPass(outputPass);
 
 			const pixelRatio = renderer.getPixelRatio();
 
+			const fxaaPass = new ShaderPass( FXAAShader );
 			fxaaPass.material.uniforms[ 'resolution' ].value.x = 1 / ( window.innerWidth  * pixelRatio );
 			fxaaPass.material.uniforms[ 'resolution' ].value.y = 1 / ( window.innerHeight * pixelRatio );
-
-			const composer2 = new EffectComposer( renderer );
-			composer2.addPass( renderPass );
-			composer2.addPass( outputPass );
-
-			// FXAA is engineered to be applied towards the end of engine post processing after conversion to low dynamic range and conversion to the sRGB color space for display.
-
-			composer2.addPass( fxaaPass );
+			
+			composer2.addPass(fxaaPass);
 
 			// Animation loop
 			function animate() {
