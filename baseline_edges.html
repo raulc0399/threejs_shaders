@@ -42,11 +42,12 @@
 			import * as THREE from 'three';
 			import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 			// Scene setup
 			const scene = new THREE.Scene();
 			const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-			const renderer = new THREE.WebGLRenderer();
+			const renderer = new THREE.WebGLRenderer({logarithmicDepthBuffer: true});
 			renderer.setSize(window.innerWidth, window.innerHeight);
 			document.body.appendChild(renderer.domElement);
 
@@ -90,10 +91,17 @@
 
 							o.traverse((child) => {
 								if (child.isMesh) {
-									const edgesGeometry = new THREE.EdgesGeometry(child.geometry);
+									const geometry = mergeVertices(child.geometry);
+									geometry.computeVertexNormals();
+
+									const edgesGeometry = new THREE.EdgesGeometry(geometry);
 									const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x00FFF0 });
 									const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
 									model.add(edges);
+
+									const material = new THREE.MeshPhongMaterial({ color: 0x000000});
+									const mesh = new THREE.Mesh(geometry, material);
+									model.add(mesh);
 								}
 							});
 
