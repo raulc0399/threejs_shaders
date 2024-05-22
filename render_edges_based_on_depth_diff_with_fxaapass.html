@@ -126,7 +126,6 @@
 			
 			composer2.addPass(fxaaPass);
 
-			const depthTexture = new THREE.DepthTexture();
 			// const renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
 			// 	depthTexture: depthTexture,
 			// 	depthBuffer: true,
@@ -233,8 +232,6 @@
 			const wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
 			wall2.position.set(0, 0, -60);
 			scene2.add(wall2);
-
-			const basicMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
 			// todo: show delta of depth
 
